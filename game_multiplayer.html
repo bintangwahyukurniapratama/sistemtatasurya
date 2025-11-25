@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy Clash: Secure Multiplayer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- LIBRARY FIREBASE (Wajib Online) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body {
+            background-color: #050510;
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            background-image: radial-gradient(circle at center, #1a1a40 0%, #000000 100%);
+            overflow-x: hidden;
+        }
+        .title-font { font-family: 'Black Ops One', cursive; }
+        
+        .screen { display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .screen.active { display: flex; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-action {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            transition: transform 0.2s;
+            width: 100%;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .btn-action:hover { transform: scale(1.02); box-shadow: 0 0 15px #2563eb; }
+
+        /* Tombol Jawaban Siswa */
+        .btn-answer {
+            background: #1f2937;
+            border: 2px solid #374151;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: 0.2s;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .btn-answer:active { transform: scale(0.98); }
+        .btn-answer:disabled { opacity: 0.5; cursor: not-allowed; background: #111827; }
+
+        input { background: rgba(0,0,0,0.5); border: 2px solid #4b5563; padding: 15px; border-radius: 10px; color: white; width: 100%; margin-bottom: 15px; text-align: center; font-size: 1.2rem; text-transform: none; }
+
+        /* Notifikasi Overlay */
+        #notif-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s;
+        }
+        
+        /* Modal Password Guru */
+        #password-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL LOGIN GURU -->
+    <div id="password-modal">
+        <div class="glass-panel w-full max-w-md relative">
+            <button onclick="closePasswordModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl">&times;</button>
+            <h2 class="text-2xl font-bold mb-4 text-blue-400">🔐 AKSES GURU</h2>
+            <p class="text-gray-400 mb-4 text-sm">Masukkan sandi keamanan untuk melanjutkan.</p>
+            <input type="password" id="admin-password" placeholder="Masukkan Sandi..." class="w-full">
+            <button onclick="verifyPassword()" class="btn-action mt-2 bg-blue-600">BUKA AKSES</button>
+            <p id="password-error" class="text-red-500 mt-3 hidden font-bold text-sm">⚠️ SANDI SALAH!</p>
+        </div>
+    </div>
+
+    <!-- LAYAR 1: MENU -->
+    <div id="screen-menu" class="screen active">
+        <h1 class="text-6xl md:text-8xl title-font text-yellow-400 mb-4 drop-shadow-lg">GALAXY CLASH</h1>
+        <p class="text-xl text-blue-300 mb-12">RACE MODE: SIAPA CEPAT DIA DAPAT</p>
+        <div class="flex flex-col md:flex-row gap-6 w-full max-w-3xl">
+            <div onclick="openPasswordModal()" class="glass-panel flex-1 cursor-pointer hover:bg-blue-900/30 transition relative overflow-hidden group">
+                <div class="absolute top-2 right-2 text-xs bg-blue-600 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition">🔒 TERKUNCI</div>
+                <div class="text-6xl mb-4">👨‍🏫</div>
+                <h2 class="text-2xl font-bold text-blue-400">MODE GURU</h2>
+                <p class="text-gray-400 mt-2">Host & Server Otomatis</p>
+            </div>
+            <div onclick="setupStudent()" class="glass-panel flex-1 cursor-pointer hover:bg-green-900/30 transition">
+                <div class="text-6xl mb-4">👨‍🚀</div>
+                <h2 class="text-2xl font-bold text-green-400">MODE SISWA</h2>
+                <p class="text-gray-400 mt-2">Join Tim</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- LAYAR 2A: GURU LOBBY -->
+    <div id="screen-teacher-lobby" class="screen">
+        <p class="text-gray-400 text-lg">KODE RUANGAN:</p>
+        <div id="room-code-display" class="text-7xl title-font text-yellow-400 mb-8 tracking-widest p-4 border-2 border-yellow-500 rounded-xl bg-black/50">...</div>
+        <div class="glass-panel w-full max-w-4xl h-96 flex flex-col">
+            <h3 class="text-xl font-bold text-left mb-4 border-b border-gray-600 pb-2">
+                TIM SIAP (<span id="player-count">0</span>)
+            </h3>
+            <div id="player-list" class="grid grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto p-2"></div>
+        </div>
+        <button onclick="startGame()" class="btn-action mt-8 bg-green-600 max-w-md">MULAI GAME ▶</button>
+    </div>
+
+    <!-- LAYAR 2B: GURU GAMEPLAY -->
+    <div id="screen-teacher-game" class="screen">
+        <div class="w-full max-w-5xl glass-panel relative">
+            <div class="flex justify-between items-center mb-6">
+                <span class="bg-blue-900 px-4 py-1 rounded">SOAL <span id="t-q-num">1</span>/10</span>
+                <span class="text-gray-400">STATUS: <span id="t-status" class="text-green-400 font-bold">LIVE</span></span>
+            </div>
+            <h2 id="t-question" class="text-3xl font-bold mb-4 text-left">...</h2>
+            <p class="text-left text-green-400 font-bold">KUNCI JAWABAN: <span id="t-answer" class="text-white">...</span></p>
+            <div class="border-t border-gray-700 my-6"></div>
+            
+            <!-- Log Aktivitas Realtime -->
+            <div class="bg-black/50 p-4 rounded-lg h-40 overflow-y-auto text-left font-mono text-sm text-gray-300" id="activity-log">
+                > Menunggu jawaban siswa...<br>
+            </div>
+        </div>
+        
+        <!-- Leaderboard -->
+        <div class="mt-8 w-full max-w-5xl">
+            <h3 class="text-left font-bold mb-2">SKOR SEMENTARA:</h3>
+            <div id="mini-leaderboard" class="flex gap-4 overflow-x-auto pb-4"></div>
+        </div>
+    </div>
+
+    <!-- LAYAR 3: SISWA LOGIN -->
+    <div id="screen-student-login" class="screen">
+        <h2 class="text-3xl font-bold mb-6">LOGIN TIM</h2>
+        <input type="text" id="inp-room-code" placeholder="KODE RUANGAN" class="max-w-xs uppercase">
+        <input type="text" id="inp-team-name" placeholder="NAMA KELOMPOK" class="max-w-xs uppercase">
+        <button onclick="joinRoom()" class="btn-action max-w-xs">GABUNG</button>
+        <button onclick="location.reload()" class="mt-4 text-gray-500">Kembali</button>
+    </div>
+
+    <!-- LAYAR 4: SISWA GAMEPLAY -->
+    <div id="screen-student-game" class="screen justify-start pt-10 hidden">
+        <!-- Waiting State -->
+        <div id="student-waiting-msg" class="text-center mt-20">
+            <div class="text-6xl animate-bounce mb-4">⏳</div>
+            <h2 class="text-2xl font-bold">MENUNGGU SOAL...</h2>
+        </div>
+
+        <!-- Question State -->
+        <div id="student-question-area" class="w-full max-w-2xl glass-panel relative hidden">
+            <div class="absolute top-0 right-0 bg-blue-600 text-white px-3 py-1 rounded-bl-lg rounded-tr-lg font-bold text-sm">
+                SKOR: <span id="s-score">0</span>
+            </div>
+            <h2 id="s-question" class="text-2xl font-bold mb-6 mt-4 text-left">...</h2>
+            <div id="s-options" class="flex flex-col gap-3"></div>
+        </div>
+    </div>
+
+    <!-- OVERLAY NOTIFIKASI -->
+    <div id="notif-overlay">
+        <div id="notif-icon" class="text-8xl mb-4">🔔</div>
+        <h2 id="notif-title" class="text-5xl font-bold mb-2 text-center">INFO</h2>
+        <p id="notif-msg" class="text-xl text-gray-300 text-center max-w-2xl">...</p>
+    </div>
+
+    <script>
+        // --- CONFIG FIREBASE ANDA (SUDAH DIISI) ---
+        // Anda tidak perlu mengedit bagian ini lagi.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAElR_qkKJ5J2powkM8B_3-9pV_T7-ixLo",
+            authDomain: "sistem-tata-surya-sd.firebaseapp.com",
+            databaseURL: "https://sistem-tata-surya-sd-default-rtdb.firebaseio.com",
+            projectId: "sistem-tata-surya-sd",
+            storageBucket: "sistem-tata-surya-sd.firebasestorage.app",
+            messagingSenderId: "517019639402",
+            appId: "1:517019639402:web:2249c27b14e17a756a3413",
+            measurementId: "G-1MQ0WQJW68"
+        };
+
+        // Init Firebase dengan Error Handling
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase berhasil terhubung!");
+        } catch (e) {
+            console.error("Gagal menghubungkan Firebase:", e);
+            alert("Error koneksi database. Cek internet Anda.");
+        }
+
+        // SOAL (Bank Soal Bisa Ditambah)
+        const questions = [
+            { q: "Planet terkecil di tata surya adalah...", a: ["Bumi", "Mars", "Merkurius", "Pluto"], c: 2 },
+            { q: "Pusat tata surya kita adalah...", a: ["Matahari", "Bulan", "Bumi", "Bintang"], c: 0 },
+            { q: "Planet merah adalah julukan untuk...", a: ["Venus", "Saturnus", "Mars", "Jupiter"], c: 2 },
+            { q: "Planet terbesar adalah...", a: ["Bumi", "Jupiter", "Saturnus", "Uranus"], c: 1 },
+            { q: "Satelit alami Bumi adalah...", a: ["Titan", "Phobos", "Bulan", "Ganymede"], c: 2 },
+            { q: "Planet bercincin indah adalah...", a: ["Saturnus", "Mars", "Merkurius", "Venus"], c: 0 },
+            { q: "Gerakan Bumi berputar pada porosnya disebut...", a: ["Revolusi", "Rotasi", "Orbit", "Gravitasi"], c: 1 },
+            { q: "Waktu yang dibutuhkan Bumi mengelilingi Matahari...", a: ["1 Hari", "1 Bulan", "1 Tahun", "1 Abad"], c: 2 },
+            { q: "Planet tempat tinggal kita...", a: ["Mars", "Bumi", "Venus", "Bulan"], c: 1 },
+            { q: "Benda langit berekor cahaya...", a: ["Meteor", "Asteroid", "Komet", "Satelit"], c: 2 }
+        ];
+
+        let roomId = "", myTeam = "", isTeacher = false;
+        let totalPlayers = 0;
+
+        // --- LOGIKA PASSWORD ---
+        function openPasswordModal() {
+            document.getElementById('password-modal').style.display = 'flex';
+            document.getElementById('admin-password').value = '';
+            document.getElementById('password-error').classList.add('hidden');
+            document.getElementById('admin-password').focus();
+        }
+
+        function closePasswordModal() {
+            document.getElementById('password-modal').style.display = 'none';
+        }
+
+        function verifyPassword() {
+            const pass = document.getElementById('admin-password').value;
+            // Sandi diset ke Admin1234 sesuai permintaan
+            if (pass === "Admin1234") {
+                closePasswordModal();
+                setupTeacher();
+            } else {
+                const err = document.getElementById('password-error');
+                err.classList.remove('hidden');
+                document.querySelector('.glass-panel').classList.add('shake');
+                setTimeout(() => document.querySelector('.glass-panel').classList.remove('shake'), 500);
+            }
+        }
+
+        document.getElementById('admin-password').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') verifyPassword();
+        });
+
+        // NAVIGASI
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // --- LOGIKA GURU (HOST) ---
+        function setupTeacher() {
+            isTeacher = true;
+            roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('room-code-display').innerText = roomId;
+
+            // Buat Room
+            db.collection('rooms').doc(roomId).set({
+                state: 'lobby', questionIdx: 0, notif: null
+            });
+
+            // Monitor Pemain
+            db.collection('rooms').doc(roomId).collection('players').onSnapshot(snap => {
+                totalPlayers = snap.size;
+                document.getElementById('player-count').innerText = totalPlayers;
+                const list = document.getElementById('player-list'); list.innerHTML = '';
+                const board = document.getElementById('mini-leaderboard'); board.innerHTML = '';
+                
+                const players = [];
+                snap.forEach(doc => {
+                    list.innerHTML += `<div class="bg-blue-900/50 p-2 rounded font-bold">${doc.id}</div>`;
+                    players.push({name: doc.id, score: doc.data().score});
+                });
+
+                players.sort((a,b) => b.score - a.score).forEach((p, i) => {
+                    board.innerHTML += `<div class="bg-black border border-gray-700 px-4 py-2 rounded-lg text-center min-w-[100px]"><div class="text-xs text-gray-400">#${i+1} ${p.name}</div><div class="text-xl font-bold text-yellow-400">${p.score}</div></div>`;
+                });
+            });
+
+            showScreen('screen-teacher-lobby');
+        }
+
+        function startGame() {
+            db.collection('rooms').doc(roomId).update({ state: 'playing', questionIdx: 0 });
+            monitorAnswers(0);
+            showScreen('screen-teacher-game');
+            updateTeacherUI(0);
+        }
+
+        let unsubscribeAnswers;
+        let roundOver = false;
+
+        function monitorAnswers(qIdx) {
+            if (unsubscribeAnswers) unsubscribeAnswers();
+            
+            const qData = questions[qIdx];
+            roundOver = false;
+            const wrongTeams = new Set();
+
+            document.getElementById('activity-log').innerHTML = `> Memulai Soal ${qIdx+1}...<br>`;
+
+            unsubscribeAnswers = db.collection('rooms').doc(roomId).collection('answers')
+                .where('qIdx', '==', qIdx)
+                .onSnapshot(snapshot => {
+                    if(roundOver) return; 
+
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const ans = change.doc.data();
+                            const team = ans.team;
+                            
+                            if (wrongTeams.has(team)) return; 
+
+                            if (ans.answerIdx === qData.c) {
+                                // --- BENAR (MENANG RONDE) ---
+                                roundOver = true; 
+                                logActivity(`> ${team} BENAR! (+100)`);
+                                
+                                db.collection('rooms').doc(roomId).collection('players').doc(team).update({
+                                    score: firebase.firestore.FieldValue.increment(100)
+                                });
+
+                                db.collection('rooms').doc(roomId).update({
+                                    notif: { title: `${team} BENAR!`, msg: "Jawaban Tepat! Lanjut...", type: 'success' }
+                                });
+
+                                setTimeout(() => nextQuestion(qIdx + 1), 4000);
+
+                            } else {
+                                // --- SALAH (KUNCI & LANJUT) ---
+                                wrongTeams.add(team);
+                                logActivity(`> ${team} SALAH.`);
+                                
+                                db.collection('rooms').doc(roomId).update({
+                                    notif: { title: `${team} SALAH!`, msg: "Kesempatan untuk tim lain!", type: 'error' }
+                                });
+                                
+                                setTimeout(() => {
+                                    if(!roundOver) { 
+                                        db.collection('rooms').doc(roomId).update({ notif: null }); 
+                                    }
+                                }, 2000);
+
+                                // Cek jika SEMUA salah
+                                if (wrongTeams.size >= totalPlayers && totalPlayers > 0) {
+                                    roundOver = true;
+                                    logActivity("> SEMUA TIM SALAH.");
+                                    
+                                    db.collection('rooms').doc(roomId).update({
+                                        notif: { title: "SEMUA SALAH!", msg: `Jawabannya: ${qData.a[qData.c]}`, type: 'info' }
+                                    });
+                                    
+                                    setTimeout(() => nextQuestion(qIdx + 1), 4000);
+                                }
+                            }
+                        }
+                    });
+                });
+        }
+
+        function nextQuestion(nextIdx) {
+            if (nextIdx >= questions.length) {
+                db.collection('rooms').doc(roomId).update({ notif: { title: "GAME OVER", msg: "Permainan Selesai!", type: 'info' } });
+                return;
+            }
+
+            db.collection('rooms').doc(roomId).update({
+                questionIdx: nextIdx,
+                notif: null
+            });
+            
+            updateTeacherUI(nextIdx);
+            monitorAnswers(nextIdx);
+        }
+
+        function updateTeacherUI(idx) {
+            const q = questions[idx];
+            document.getElementById('t-q-num').innerText = idx + 1;
+            document.getElementById('t-question').innerText = q.q;
+            document.getElementById('t-answer').innerText = q.a[q.c];
+            document.getElementById('activity-log').innerHTML = `> Menunggu jawaban soal ${idx+1}...<br>`;
+        }
+
+        function logActivity(msg) {
+            const log = document.getElementById('activity-log');
+            log.innerHTML += msg + "<br>";
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // --- LOGIKA SISWA (PLAYER) ---
+        function setupStudent() { isTeacher = false; showScreen('screen-student-login'); }
+
+        function joinRoom() {
+            const code = document.getElementById('inp-room-code').value.toUpperCase();
+            const name = document.getElementById('inp-team-name').value.toUpperCase();
+            if(!code || !name) return alert("Isi lengkap!");
+
+            roomId = code; myTeam = name;
+
+            db.collection('rooms').doc(roomId).get().then(doc => {
+                if(doc.exists) {
+                    db.collection('rooms').doc(roomId).collection('players').doc(name).set({score:0});
+                    showScreen('screen-student-game');
+                    listenStudent();
+                } else { alert("Room salah/tidak ditemukan!"); }
+            });
+        }
+
+        function listenStudent() {
+            db.collection('rooms').doc(roomId).onSnapshot(doc => {
+                const data = doc.data();
+                
+                if (data.notif) {
+                    showOverlay(data.notif.title, data.notif.msg, data.notif.type);
+                    document.getElementById('student-question-area').classList.add('hidden');
+                    document.getElementById('student-waiting-msg').classList.remove('hidden');
+                } else {
+                    document.getElementById('notif-overlay').style.display = 'none';
+                    if (data.state === 'playing') {
+                        loadStudentQuestion(data.questionIdx);
+                    }
+                }
+            });
+
+            db.collection('rooms').doc(roomId).collection('players').doc(myTeam).onSnapshot(doc => {
+                if(doc.exists) document.getElementById('s-score').innerText = doc.data().score;
+            });
+        }
+
+        let currentStudentQTitle = "";
+
+        function loadStudentQuestion(idx) {
+            const qData = questions[idx];
+            if (currentStudentQTitle !== qData.q) {
+                currentStudentQTitle = qData.q;
+                document.getElementById('student-waiting-msg').classList.add('hidden');
+                document.getElementById('student-question-area').classList.remove('hidden');
+                
+                document.getElementById('s-question').innerText = qData.q;
+                const div = document.getElementById('s-options'); div.innerHTML = '';
+                
+                qData.a.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = "btn-answer text-white hover:bg-gray-700";
+                    btn.innerText = opt;
+                    btn.onclick = () => submitAnswer(i, idx);
+                    div.appendChild(btn);
+                });
+            }
+        }
+
+        function submitAnswer(ansIdx, qIdx) {
+            const btns = document.querySelectorAll('.btn-answer');
+            btns.forEach(b => b.disabled = true);
+            btns[ansIdx].style.background = "#d97706";
+
+            db.collection('rooms').doc(roomId).collection('answers').add({
+                team: myTeam,
+                answerIdx: ansIdx,
+                qIdx: qIdx,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        // --- UI UMUM ---
+        function showOverlay(title, msg, type) {
+            const el = document.getElementById('notif-overlay');
+            const icon = document.getElementById('notif-icon');
+            const t = document.getElementById('notif-title');
+            document.getElementById('notif-msg').innerText = msg;
+            t.innerText = title;
+            
+            if(type === 'success') { t.className="text-5xl font-bold text-green-500 mb-2"; icon.innerText="🎉"; }
+            else if(type === 'error') { t.className="text-5xl font-bold text-red-500 mb-2"; icon.innerText="❌"; }
+            else { t.className="text-5xl font-bold text-blue-500 mb-2"; icon.innerText="ℹ️"; }
+            
+            el.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

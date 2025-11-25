@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis Tata Surya (Feedback Lengkap)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- TEMA VISUAL --- */
+        body {
+            background: radial-gradient(circle at bottom, #1b2735 0%, #090a0f 100%);
+            color: white;
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Background Bintang Bergerak */
+        .stars {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent;
+            z-index: -1;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite ease-in-out;
+        }
+        @keyframes twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        /* Glassmorphism Card */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Tombol Opsi */
+        .option-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .option-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #60a5fa;
+            transform: translateY(-2px);
+        }
+        .option-btn:active {
+            transform: translateY(0);
+        }
+        
+        /* Status Jawaban */
+        .correct {
+            background-color: #22c55e !important; /* Hijau */
+            border-color: #15803d !important;
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
+        }
+        .wrong {
+            background-color: #ef4444 !important; /* Merah */
+            border-color: #b91c1c !important;
+            opacity: 0.7;
+        }
+
+        /* Animasi Layar */
+        .screen { display: none; opacity: 0; transition: opacity 0.5s; }
+        .screen.active { display: flex; opacity: 1; }
+
+        .font-sci { font-family: 'Rajdhani', sans-serif; }
+
+        /* Animasi Timer (30 Detik) */
+        @keyframes timerReduce {
+            from { width: 100%; background-color: #22c55e; }
+            50% { background-color: #eab308; }
+            to { width: 0%; background-color: #ef4444; }
+        }
+        .timer-running {
+            animation: timerReduce 30s linear forwards;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex justify-center items-center p-4">
+
+    <div id="star-container" class="stars"></div>
+
+    <!-- 1. LAYAR MULAI -->
+    <div id="start-screen" class="screen active flex-col items-center text-center max-w-lg w-full">
+        <div class="mb-6 text-6xl">⭐</div>
+        <h1 class="text-4xl md:text-5xl font-bold text-yellow-400 font-sci mb-2 neon-text">KUIS TATA SURYA</h1>
+        <p class="text-gray-300 mb-8 text-lg">Jawab pertanyaan sesuai yang kamu lihat di simulasi!</p>
+        
+        <div class="glass-panel p-6 rounded-2xl w-full mb-8">
+            <div class="flex justify-around text-sm text-gray-300">
+                <div class="flex flex-col">
+                    <span class="font-bold text-xl text-yellow-400">30</span>
+                    <span>Soal</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-xl text-green-400">30s</span>
+                    <span>Waktu</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-xl text-purple-400">Mudah</span>
+                    <span>Level</span>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="initGame()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105">
+            MULAI 🚀
+        </button>
+    </div>
+
+    <!-- 2. LAYAR KUIS -->
+    <div id="quiz-screen" class="screen flex-col w-full max-w-2xl relative">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-sm font-sci text-gray-400">
+                SOAL <span id="current-q-num" class="text-white font-bold text-lg">1</span> / 30
+            </div>
+            <div class="text-sm font-sci text-gray-400">
+                SKOR: <span id="current-score" class="text-green-400 font-bold text-lg">0</span>
+            </div>
+        </div>
+
+        <!-- Timer Bar -->
+        <div class="w-full bg-gray-700 h-3 rounded-full mb-6 overflow-hidden border border-gray-600">
+            <div id="timer-bar" class="h-full w-full"></div>
+        </div>
+
+        <!-- Pertanyaan -->
+        <div class="glass-panel p-6 md:p-8 rounded-2xl mb-6 min-h-[120px] flex items-center justify-center">
+            <h2 id="question-text" class="text-xl md:text-2xl font-bold text-center leading-relaxed">
+                ...
+            </h2>
+        </div>
+
+        <!-- Opsi Jawaban -->
+        <div id="options-container" class="grid grid-cols-1 gap-3">
+            <!-- Tombol akan digenerate di sini -->
+        </div>
+    </div>
+
+    <!-- 3. LAYAR HASIL -->
+    <div id="result-screen" class="screen flex-col items-center text-center max-w-lg w-full">
+        <div class="text-6xl mb-4 animate-bounce">🌟</div>
+        <h2 class="text-3xl font-bold font-sci text-white mb-2">SELESAI!</h2>
+        <p id="feedback-msg" class="text-gray-300 mb-8">Hebat!</p>
+
+        <div class="glass-panel p-8 rounded-2xl w-full mb-8 border-t-4 border-yellow-500">
+            <p class="text-gray-400 text-sm uppercase tracking-widest mb-2">Skor Akhir</p>
+            <div id="final-score" class="text-7xl font-bold text-white mb-4 font-sci">0</div>
+            <p class="text-sm text-gray-300">Benar: <span id="correct-count" class="text-green-400 font-bold">0</span> / 30</p>
+        </div>
+
+        <button onclick="location.reload()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all">
+            MAIN LAGI 🔄
+        </button>
+    </div>
+
+    <script>
+        // ==========================================
+        // BANK SOAL SANGAT MUDAH
+        // ==========================================
+        const questionBank = [
+            { q: "Pusat tata surya yang berwarna kuning terang adalah...", a: ["Bumi", "Matahari", "Bulan"], c: 1 },
+            { q: "Planet yang paling dekat dengan Matahari adalah...", a: ["Merkurius", "Bumi", "Neptunus"], c: 0 },
+            { q: "Planet urutan kedua dari Matahari adalah...", a: ["Mars", "Venus", "Jupiter"], c: 1 },
+            { q: "Planet tempat tinggal kita (urutan ke-3) adalah...", a: ["Bumi", "Mars", "Saturnus"], c: 0 },
+            { q: "Planet urutan ke-4 yang berwarna merah adalah...", a: ["Venus", "Mars", "Merkurius"], c: 1 },
+            { q: "Planet yang letaknya paling jauh dari Matahari adalah...", a: ["Uranus", "Neptunus", "Bumi"], c: 1 },
+            { q: "Planet yang ukurannya paling besar di simulasi adalah...", a: ["Bumi", "Mars", "Jupiter"], c: 2 },
+            { q: "Planet yang memiliki cincin besar melingkarinya adalah...", a: ["Saturnus", "Mars", "Merkurius"], c: 0 },
+            { q: "Planet yang berwarna biru tua adalah...", a: ["Mars", "Neptunus", "Venus"], c: 1 },
+            { q: "Planet yang berwarna biru muda adalah...", a: ["Uranus", "Bumi", "Mars"], c: 0 },
+            { q: "Planet yang terlihat berwarna merah adalah...", a: ["Mars", "Venus", "Saturnus"], c: 0 },
+            { q: "Planet terkecil yang paling dekat Matahari adalah...", a: ["Jupiter", "Merkurius", "Uranus"], c: 1 },
+            { q: "Benda langit yang mengelilingi Bumi di simulasi adalah...", a: ["Matahari", "Bulan", "Bintang"], c: 1 },
+            { q: "Semua planet di simulasi bergerak mengelilingi...", a: ["Bumi", "Bulan", "Matahari"], c: 2 },
+            { q: "Jalur garis tipis tempat planet berjalan disebut...", a: ["Jalan Raya", "Orbit", "Jembatan"], c: 1 },
+            { q: "Planet yang bergerak (berlari) paling cepat mengelilingi Matahari adalah...", a: ["Merkurius", "Bumi", "Neptunus"], c: 0 },
+            { q: "Planet yang bergerak paling lambat di jalur paling luar adalah...", a: ["Merkurius", "Neptunus", "Mars"], c: 1 },
+            { q: "Kumpulan batu kecil yang berbaris di antara Mars dan Jupiter disebut...", a: ["Sabuk Asteroid", "Cincin Saturnus", "Awan"], c: 0 },
+            { q: "Benda kecil buatan manusia yang mengelilingi Bumi disebut...", a: ["Satelit Buatan", "Bulan", "Pesawat"], c: 0 },
+            { q: "Benda langit yang memiliki 'ekor' panjang disebut...", a: ["Komet", "Asteroid", "Planet"], c: 0 },
+            { q: "Warna Matahari di simulasi adalah...", a: ["Biru", "Kuning/Oranye", "Hijau"], c: 1 },
+            { q: "Planet Bumi di simulasi berwarna...", a: ["Merah", "Biru dan Hijau", "Kuning"], c: 1 },
+            { q: "Benda langit yang mengelilingi planet disebut...", a: ["Satelit", "Bintang", "Matahari"], c: 0 },
+            { q: "Nama galaksi kita adalah...", a: ["Andromeda", "Bima Sakti", "Snikers"], c: 1 },
+            { q: "Gerakan planet berputar pada dirinya sendiri disebut...", a: ["Lari", "Rotasi", "Jalan"], c: 1 },
+            { q: "Gerakan planet mengelilingi Matahari disebut...", a: ["Revolusi", "Rotasi", "Diam"], c: 0 },
+            { q: "Apakah Matahari bergerak mengelilingi Bumi?", a: ["Ya", "Tidak", "Kadang-kadang"], c: 1 },
+            { q: "Apakah Jupiter lebih besar dari Bumi?", a: ["Ya", "Tidak", "Sama saja"], c: 0 },
+            { q: "Planet mana yang punya 'Bintik Merah Besar'?", a: ["Jupiter", "Mars", "Venus"], c: 0 },
+            { q: "Planet mana yang dijuluki Bintang Fajar?", a: ["Venus", "Saturnus", "Neptunus"], c: 0 },
+            { q: "Apakah Bulan termasuk planet?", a: ["Ya", "Tidak (Satelit)", "Mungkin"], c: 1 },
+            { q: "Berapa jumlah planet utama di tata surya?", a: ["7", "8", "9"], c: 1 },
+            { q: "Planet apa yang letaknya sesudah Bumi?", a: ["Mars", "Venus", "Merkurius"], c: 0 },
+            { q: "Planet apa yang letaknya sebelum Bumi?", a: ["Mars", "Venus", "Jupiter"], c: 1 },
+            { q: "Saturnus terkenal karena apanya?", a: ["Warnanya", "Cincinnya", "Panasnya"], c: 1 },
+            { q: "Apakah Merkurius punya cincin?", a: ["Punya", "Tidak Punya", "Sedikit"], c: 1 }
+        ];
+
+        // ==========================================
+        // LOGIKA GAME
+        // ==========================================
+        
+        let activeQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let canAnswer = false;
+        let timerInterval;
+
+        // Membuat Bintang Background
+        function createStars() {
+            const container = document.getElementById('star-container');
+            for(let i=0; i<50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                const xy = Math.random() * 100;
+                const duration = Math.random() * 3 + 2;
+                const size = Math.random() * 2 + 1;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.animationDuration = `${duration}s`;
+                container.appendChild(star);
+            }
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            const shuffled = shuffleArray([...questionBank]);
+            activeQuestions = shuffled.slice(0, 30);
+            currentQuestionIndex = 0;
+            score = 0;
+            
+            document.getElementById('start-screen').classList.remove('active');
+            document.getElementById('quiz-screen').classList.add('active');
+            
+            loadQuestion();
+        }
+
+        function startTimer() {
+            const bar = document.getElementById('timer-bar');
+            bar.classList.remove('timer-running');
+            void bar.offsetWidth; 
+            bar.classList.add('timer-running');
+
+            clearTimeout(timerInterval);
+            timerInterval = setTimeout(() => {
+                timeOut();
+            }, 30000); // 30 Detik
+        }
+
+        function stopTimer() {
+            const bar = document.getElementById('timer-bar');
+            bar.style.width = getComputedStyle(bar).width;
+            bar.classList.remove('timer-running');
+            clearTimeout(timerInterval);
+        }
+
+        function timeOut() {
+            if (!canAnswer) return;
+            canAnswer = false;
+            
+            // Tampilkan jawaban benar saat waktu habis
+            const allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(btn => {
+                if (btn.dataset.isCorrect === "true") {
+                    btn.classList.add('correct'); // Hijau
+                } else {
+                    btn.classList.add('wrong');
+                }
+            });
+            
+            setTimeout(() => {
+                nextQuestion();
+            }, 2000); // Tunggu 2 detik biar siswa sempat lihat
+        }
+
+        function loadQuestion() {
+            canAnswer = true;
+            const data = activeQuestions[currentQuestionIndex];
+            
+            document.getElementById('current-q-num').innerText = currentQuestionIndex + 1;
+            document.getElementById('current-score').innerText = score;
+            document.getElementById('question-text').innerText = data.q;
+            
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            let answers = data.a.map((ans, idx) => ({ txt: ans, isCorrect: idx === data.c }));
+            answers = shuffleArray(answers);
+
+            answers.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "option-btn bg-gray-800 bg-opacity-50 text-white font-semibold py-3 px-6 rounded-xl text-left w-full text-lg shadow-sm flex items-center gap-3";
+                // SIMPAN STATUS JAWABAN DI DATA ATTRIBUTE
+                btn.dataset.isCorrect = opt.isCorrect;
+                
+                btn.innerHTML = `
+                    <div class="bg-blue-600 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        ${String.fromCharCode(65 + index)}
+                    </div>
+                    <span>${opt.txt}</span>
+                `;
+                btn.onclick = () => checkAnswer(opt.isCorrect, btn);
+                container.appendChild(btn);
+            });
+
+            startTimer();
+        }
+
+        function checkAnswer(isCorrect, btnElement) {
+            if (!canAnswer) return;
+            canAnswer = false;
+            stopTimer();
+
+            const allBtns = document.querySelectorAll('.option-btn');
+
+            if (isCorrect) {
+                btnElement.classList.add('correct');
+                score += 10;
+            } else {
+                btnElement.classList.add('wrong'); // Merah
+                
+                // CARI DAN NYALAKAN JAWABAN YANG BENAR (HIJAU)
+                allBtns.forEach(btn => {
+                    if (btn.dataset.isCorrect === "true") {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+
+            setTimeout(() => {
+                nextQuestion();
+            }, 2000); // Tunggu 2 detik biar siswa sempat lihat
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < 30) {
+                loadQuestion();
+            } else {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            document.getElementById('quiz-screen').classList.remove('active');
+            document.getElementById('result-screen').classList.add('active');
+            
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('correct-count').innerText = Math.floor(score / 10);
+
+            const feedback = document.getElementById('feedback-msg');
+            if (score >= 250) feedback.innerText = "Luar Biasa! Kamu Hebat!";
+            else if (score >= 150) feedback.innerText = "Bagus! Belajar lagi ya.";
+            else feedback.innerText = "Jangan menyerah, coba lagi!";
+        }
+
+        createStars();
+
+    </script>
+</body>
+</html>
